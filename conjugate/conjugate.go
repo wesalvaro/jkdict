@@ -54,8 +54,8 @@ var conjugators = map[string]conjugator{
 	"v5u": conjugator{[]string{"う"}, fillConjugator(v5Conjugator(v5uConjugator))},
 	// TODO: v5u-s
 	// TODO: v5z
-	"vk":   conjugator{[]string{"来る", "來る", "くる"}, fillConjugator(vkConjugator)},
-	"vs-i": conjugator{[]string{"為る", "する"}, fillConjugator(vsiConjugator)},
+	"vk":   conjugator{[]string{"くる", "来る", "來る"}, fillConjugator(vkConjugator)},
+	"vs-i": conjugator{[]string{"する", "為る", "す"}, fillConjugator(vsiConjugator)},
 }
 
 // Conjugate a word given its part-of-speech.
@@ -70,25 +70,25 @@ func Conjugate(word string, pos string) *Conjugations {
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("Expected %s %s to end with %s", pos, string(word), c.expectedEnd)
+			if r == "checkSuffix" {
+				log.Printf("Expected %s %s to end with %s", pos, string(word), c.expectedEnd)
+			} else {
+				log.Fatal(r)
+			}
 		}
 	}()
-	checkSuffix(runeWord, pos, c.expectedEnd)
+	checkSuffix(runeWord, c.expectedEnd)
 	return c.conjugate(runeWord)
 }
 
-func checkSuffix(word []rune, pos string, expected []string) {
-	suffixLength := len([]rune(expected[0]))
-	suffix := string(word[len(word)-suffixLength:])
+func checkSuffix(word []rune, expected []string) {
 	for _, e := range expected {
-		if suffixLength != len([]rune(e)) {
-			log.Fatal("All suffixes must be the same length.")
-		}
+		suffix := string(word[len(word)-len([]rune(e)):])
 		if suffix == e {
 			return
 		}
 	}
-	panic("Didn't find an expected ending.")
+	panic("checkSuffix")
 }
 
 func cutOff(word []rune, n int) string {
@@ -103,7 +103,7 @@ func fillConjugator(inner func([]rune) *Conjugations) func([]rune) *Conjugations
 	return func(word []rune) *Conjugations {
 		c := inner(word)
 		naiForm := []rune(c.Negative)
-		checkSuffix(naiForm, "Negative", []string{"ない"})
+		checkSuffix(naiForm, []string{"ない"})
 		c.Conditional = c.Past + "ら"
 		c.NegativeNominal = cutOff(naiForm, 2) + "なく"
 		c.NegativeParticiple = cutOff(naiForm, 2) + "ないで"
@@ -156,12 +156,12 @@ func v5Conjugator(inner func([]rune) Conjugations) func([]rune) *Conjugations {
 		c := inner(word)
 
 		Negative := []rune(c.Negative)
-		checkSuffix(Negative, "Negative", []string{"ない"})
+		checkSuffix(Negative, []string{"ない"})
 		c.Causative = cutOff(Negative, 2) + "せる"
 		c.Passive = cutOff(Negative, 2) + "れる"
 
 		Potential := []rune(c.Potential)
-		checkSuffix(Potential, "Potential", []string{"る"})
+		checkSuffix(Potential, []string{"る"})
 		c.Imperative = cutOffOne(Potential)
 		c.ProvisionalConditional = cutOffOne(Potential) + "ば"
 		return &c
@@ -302,10 +302,9 @@ func vkConjugator(word []rune) *Conjugations {
 }
 
 func vsiConjugator(word []rune) *Conjugations {
-	var c Conjugations
-	if word[len(word)-2] == 'す' {
-		root := cutOff(word, 2)
-		c = Conjugations{
+	var c *Conjugations
+	suConj := func(root string) *Conjugations {
+		return &Conjugations{
 			Causative:              root + "させる",
 			Imperative:             root + "しろ",
 			Nominal:                root + "し",
@@ -314,11 +313,16 @@ func vsiConjugator(word []rune) *Conjugations {
 			ProvisionalConditional: root + "すれば",
 			Volitional:             root + "しよう",
 		}
+	}
+	if word[len(word)-2] == 'す' {
+		c = suConj(cutOff(word, 2))
+	} else if word[len(word)-1] == 'す' {
+		c = suConj(cutOffOne(word))
 	} else {
-		c = Conjugations{Nominal: string(word[:len(word)-1])}
+		c = &Conjugations{Nominal: cutOffOne(word)}
 	}
 	c.Negative = c.Nominal + "ない"
 	c.Participle = c.Nominal + "て"
 	c.Past = c.Nominal + "た"
-	return &c
+	return c
 }
