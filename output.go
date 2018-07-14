@@ -210,7 +210,6 @@ var (
 			{Hi: 0x1f200, Lo: 0x1f200, Stride: 1},
 		},
 	}
-	otherRange = []*unicode.RangeTable{unicode.Hyphen, unicode.Diacritic}
 )
 
 type section struct {
