@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package unique-identifier="uid">
+  <metadata>
+    <dc-metadata xmlns:dc="http://purl.org/metadata/dublin_core">
+      <dc:Identifier id="uid">{{ .MetaData.UID }}</dc:Identifier>
+      <dc:Title>{{ .MetaData.Title }}</dc:Title>
+      <dc:Language>{{ .MetaData.Language }}</dc:Language>
+      <dc:Creator>{{ .MetaData.Creator }}</dc:Creator>
+      <dc:Date>{{ .Date.Format "2006-01-02" }}</dc:Date>
+      <dc:Copyrights>{{ .Date.Format "2006" }} {{ .MetaData.Copyright }}</dc:Copyrights>
+    </dc-metadata>
+    <x-metadata>
+      <output encoding="UTF-8" flatten-dynamic-dir="yes"/>
+      <DictionaryInLanguage>{{ .MetaData.InLang }}</DictionaryInLanguage>
+      <DictionaryOutLanguage>{{ .MetaData.OutLang }}</DictionaryOutLanguage>
+    </x-metadata>
+  </metadata>
+  <manifest>
+    <item id="cover" href="cover.png" media-type="image/png" properties="cover-image"/>
+    <item id="css" href="style.css" media-type="text/css"/>
+    <item id="info" href="info.html" media-type="text/x-oeb1-document"/>
+    {{- range .Sections }}
+    <item id="section-{{ .ID }}" href="section-{{ .ID }}.html" media-type="text/x-oeb1-document"/>
+    {{- end }}
+  </manifest>
+  <spine>
+    <itemref idref="info"/>
+    {{- range .Sections }}
+    <itemref idref="section-{{ .ID }}"/>
+    {{- end }}
+  </spine>
+  <tours/>
+  <guide/>
+</package>

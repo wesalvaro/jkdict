@@ -1,0 +1,13 @@
+body {
+  margin: 0;
+}
+
+dt {
+  font-weight: bold;
+}
+
+.misc,
+.pos {
+  font-style:italic;
+  color:#666;
+}

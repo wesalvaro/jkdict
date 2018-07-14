@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html
+    xmlns:mbp="https://kindlegen.s3.amazonaws.com/AmazonKindlePublishingGuidelines.pdf">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  {{ define "conjugations" -}}
+  {{- if . -}}
+  <idx:infl>
+    {{- if .Causative }}<idx:iform value="{{ .Causative }}"></idx:iform>{{ end }}
+    {{- if .Conditional }}<idx:iform value="{{ .Conditional }}"></idx:iform>{{ end }}
+    {{- if .Imperative }}<idx:iform value="{{ .Imperative }}"></idx:iform>{{ end }}
+    {{- if .Negative }}<idx:iform value="{{ .Negative }}"></idx:iform>{{ end }}
+    {{- if .NegativeNominal }}<idx:iform value="{{ .NegativeNominal }}"></idx:iform>{{ end }}
+    {{- if .NegativeParticiple }}<idx:iform value="{{ .NegativeParticiple }}"></idx:iform>{{ end }}
+    {{- if .NegativePast }}<idx:iform value="{{ .NegativePast }}"></idx:iform>{{ end }}
+    {{- if .NegativePolite }}<idx:iform value="{{ .NegativePolite }}"></idx:iform>{{ end }}
+    {{- if .NegativeProvisionalConditional }}<idx:iform value="{{ .NegativeProvisionalConditional }}"></idx:iform>{{ end }}
+    {{- if .NegativeProvisionalConditionalColloquial }}<idx:iform value="{{ .NegativeProvisionalConditionalColloquial }}"></idx:iform>{{ end }}
+    {{- if .Nominal }}<idx:iform value="{{ .Nominal }}"></idx:iform>{{ end }}
+    {{- if .Participle }}<idx:iform value="{{ .Participle }}"></idx:iform>{{ end }}
+    {{- if .Passive }}<idx:iform value="{{ .Passive }}"></idx:iform>{{ end }}
+    {{- if .Past }}<idx:iform value="{{ .Past }}"></idx:iform>{{ end }}
+    {{- if .PastPolite }}<idx:iform value="{{ .PastPolite }}"></idx:iform>{{ end }}
+    {{- if .Polite }}<idx:iform value="{{ .Polite }}"></idx:iform>{{ end }}
+    {{- if .Potential }}<idx:iform value="{{ .Potential }}"></idx:iform>{{ end }}
+    {{- if .ProvisionalConditional }}<idx:iform value="{{ .ProvisionalConditional }}"></idx:iform>{{ end }}
+    {{- if .Volitional }}<idx:iform value="{{ .Volitional }}"></idx:iform>{{ end }}
+    {{- if .VolitionalPolite }}<idx:iform value="{{ .VolitionalPolite }}"></idx:iform>{{ end }}
+    {{- if .Wish }}<idx:iform value="{{ .Wish }}"></idx:iform>{{ end }}
+    {{- if .WishNominal }}<idx:iform value="{{ .WishNominal }}"></idx:iform>{{ end }}
+    {{- if .WishPast }}<idx:iform value="{{ .WishPast }}"></idx:iform>{{ end -}}
+  </idx:infl>
+  {{- end -}}
+  {{- end -}}
+
+  <mbp:frameset>
+  {{ range .Entries }}
+  <idx:entry>
+    <dt>
+      {{- (index .Reading 0).Reading }}
+      {{- if .Kanji -}}
+      【{{ range $i, $e := .Kanji }}{{- if $i }}；{{ end }}{{ $e.Kanji }}{{ end }}】
+      {{- end -}}
+    </dt>
+
+    <ul>
+      {{- range .Sense }}
+      <li>
+        {{- range $i, $e := .Gloss }}
+        {{- if $i }}, {{ end }}{{ $e }}
+        {{- end }}
+
+        {{- if or .PartOfSpeech .Misc }} &mdash; {{ end }}
+
+        {{- if .PartOfSpeech }}
+        <span class="pos">
+          {{- range $i, $e := .PartOfSpeech }}
+          {{- if $i }}, {{ end }}{{ posConvert $e }}
+          {{- end -}}
+        </span>
+        {{- if .Misc }}; {{ end }}
+        {{- end }}
+
+        {{- if .Misc }}
+        <span class="misc">
+          {{- range $i, $e := .Misc }}
+          {{- if $i }}, {{ end }}{{ posConvert $e }}
+          {{- end -}}
+        </span>
+        {{- end -}}
+      </li>
+      {{- end }}
+    </ul>
+
+    {{- range $r, $c := .Conjugate -}}
+    <idx:orth value="{{ $r }}">
+      {{- template "conjugations" $c -}}
+    </idx:orth>
+    {{- end }}
+  </idx:entry>
+  {{ end }}
+  </mbp:frameset>
+</body>
+</html>
