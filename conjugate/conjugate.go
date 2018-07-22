@@ -57,6 +57,7 @@ func loadPos() map[string]posID {
 		}
 		result[record[1]] = posID(id)
 	}
+	// Don't bother conjugating things that just get です・する added:
 	delete(result, "n")
 	delete(result, "adj-na")
 	delete(result, "vs")
