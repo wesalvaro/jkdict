@@ -6,36 +6,6 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  {{ define "conjugations" -}}
-  {{- if . -}}
-  <idx:infl>
-    {{- if .Causative }}<idx:iform value="{{ .Causative }}"></idx:iform>{{ end }}
-    {{- if .Conditional }}<idx:iform value="{{ .Conditional }}"></idx:iform>{{ end }}
-    {{- if .Imperative }}<idx:iform value="{{ .Imperative }}"></idx:iform>{{ end }}
-    {{- if .Negative }}<idx:iform value="{{ .Negative }}"></idx:iform>{{ end }}
-    {{- if .NegativeNominal }}<idx:iform value="{{ .NegativeNominal }}"></idx:iform>{{ end }}
-    {{- if .NegativeParticiple }}<idx:iform value="{{ .NegativeParticiple }}"></idx:iform>{{ end }}
-    {{- if .NegativePast }}<idx:iform value="{{ .NegativePast }}"></idx:iform>{{ end }}
-    {{- if .NegativePolite }}<idx:iform value="{{ .NegativePolite }}"></idx:iform>{{ end }}
-    {{- if .NegativeProvisionalConditional }}<idx:iform value="{{ .NegativeProvisionalConditional }}"></idx:iform>{{ end }}
-    {{- if .NegativeProvisionalConditionalColloquial }}<idx:iform value="{{ .NegativeProvisionalConditionalColloquial }}"></idx:iform>{{ end }}
-    {{- if .Nominal }}<idx:iform value="{{ .Nominal }}"></idx:iform>{{ end }}
-    {{- if .Participle }}<idx:iform value="{{ .Participle }}"></idx:iform>{{ end }}
-    {{- if .Passive }}<idx:iform value="{{ .Passive }}"></idx:iform>{{ end }}
-    {{- if .Past }}<idx:iform value="{{ .Past }}"></idx:iform>{{ end }}
-    {{- if .PastPolite }}<idx:iform value="{{ .PastPolite }}"></idx:iform>{{ end }}
-    {{- if .Polite }}<idx:iform value="{{ .Polite }}"></idx:iform>{{ end }}
-    {{- if .Potential }}<idx:iform value="{{ .Potential }}"></idx:iform>{{ end }}
-    {{- if .ProvisionalConditional }}<idx:iform value="{{ .ProvisionalConditional }}"></idx:iform>{{ end }}
-    {{- if .Volitional }}<idx:iform value="{{ .Volitional }}"></idx:iform>{{ end }}
-    {{- if .VolitionalPolite }}<idx:iform value="{{ .VolitionalPolite }}"></idx:iform>{{ end }}
-    {{- if .Wish }}<idx:iform value="{{ .Wish }}"></idx:iform>{{ end }}
-    {{- if .WishNominal }}<idx:iform value="{{ .WishNominal }}"></idx:iform>{{ end }}
-    {{- if .WishPast }}<idx:iform value="{{ .WishPast }}"></idx:iform>{{ end -}}
-  </idx:infl>
-  {{- end -}}
-  {{- end -}}
-
   <mbp:frameset>
   {{ range .Entries }}
   <idx:entry>
@@ -75,9 +45,15 @@
       {{- end }}
     </ul>
 
-    {{- range $r, $c := .Conjugate -}}
+    {{- range $r, $c := .Conjugate }}
     <idx:orth value="{{ $r }}">
-      {{- template "conjugations" $c -}}
+      {{- if $c }}
+      <idx:infl>
+        {{- range $c }}
+        <idx:iform value="{{ . }}"></idx:iform>
+        {{- end }}
+      </idx:infl>
+      {{- end -}}
     </idx:orth>
     {{- end }}
   </idx:entry>

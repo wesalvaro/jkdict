@@ -71,19 +71,63 @@ type entry struct {
 	Sense   []sense   `xml:"sense"`
 }
 
-func (e entry) Conjugate() map[string]*conjugate.Conjugations {
-	c := make(map[string]*conjugate.Conjugations)
+func (e entry) Conjugate() map[string][]string {
+	c := make(map[string][]string)
+	addVariants := func(variants []conjugate.Variant) []string {
+		var variantStrings []string
+		for _, v := range variants {
+			variantStrings = append(
+				variantStrings, v.Plain, v.Formal, v.PlainNegative, v.FormalNegative)
+		}
+		return variantStrings
+	}
+	addConjugations := func(reading string, conjugations *conjugate.Conjugations) {
+		if conjugations == nil {
+			return
+		}
+		c[reading] = append(c[reading], addVariants(conjugations.NonPast)...)
+		c[reading] = append(c[reading], addVariants(conjugations.Past)...)
+		c[reading] = append(c[reading], addVariants(conjugations.Conjunctive)...)
+		c[reading] = append(c[reading], addVariants(conjugations.Provisional)...)
+		c[reading] = append(c[reading], addVariants(conjugations.Potential)...)
+		c[reading] = append(c[reading], addVariants(conjugations.Passive)...)
+		c[reading] = append(c[reading], addVariants(conjugations.Causative)...)
+		c[reading] = append(c[reading], addVariants(conjugations.CausativePassive)...)
+		c[reading] = append(c[reading], addVariants(conjugations.Volitional)...)
+		c[reading] = append(c[reading], addVariants(conjugations.Imperative)...)
+		c[reading] = append(c[reading], addVariants(conjugations.Conditional)...)
+		c[reading] = append(c[reading], addVariants(conjugations.Alternative)...)
+		c[reading] = append(c[reading], addVariants(conjugations.Continuative)...)
+	}
+	var readings []string
+	for _, k := range e.Kanji {
+		readings = append(readings, k.Kanji)
+	}
+	for _, r := range e.Reading {
+		readings = append(readings, r.Reading)
+	}
 	for _, pos := range e.Sense[0].PartOfSpeech {
-		for _, k := range e.Kanji {
-			if c[k.Kanji] == nil {
-				c[k.Kanji] = conjugate.Conjugate(k.Kanji, pos)
+		for _, r := range readings {
+			if c[r] == nil {
+				c[r] = []string{}
+			}
+			if len(c[r]) > 0 {
+				continue
+			}
+			addConjugations(r, conjugate.Conjugate(r, pos))
+		}
+	}
+	filterEmpty := func(s []string) []string {
+		var r []string
+		for _, str := range s {
+			if str != "" {
+				r = append(r, str)
 			}
 		}
-		for _, r := range e.Reading {
-			if c[r.Reading] == nil {
-				c[r.Reading] = conjugate.Conjugate(r.Reading, pos)
-			}
-		}
+		return r
+	}
+	for k, v := range c {
+		c[k] = filterEmpty(v)
 	}
 	return c
 }

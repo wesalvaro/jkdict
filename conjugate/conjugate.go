@@ -1,328 +1,228 @@
 package conjugate
 
 import (
+	"encoding/csv"
+	"io"
 	"log"
-	"unicode"
+	"os"
+	"strconv"
 )
 
 // Conjugations of a word.
 type Conjugations struct {
-	Causative                                string
-	Conditional                              string
-	Imperative                               string
-	Negative                                 string
-	NegativeNominal                          string
-	NegativeParticiple                       string
-	NegativePast                             string
-	NegativePolite                           string
-	NegativeProvisionalConditional           string
-	NegativeProvisionalConditionalColloquial string
-	Nominal                                  string
-	Participle                               string
-	Passive                                  string
-	Past                                     string
-	PastPolite                               string
-	Polite                                   string
-	Potential                                string
-	ProvisionalConditional                   string
-	Volitional                               string
-	VolitionalPolite                         string
-	Wish                                     string
-	WishNominal                              string
-	WishPast                                 string
+	NonPast          []Variant
+	Past             []Variant
+	Conjunctive      []Variant
+	Provisional      []Variant
+	Potential        []Variant
+	Passive          []Variant
+	Causative        []Variant
+	CausativePassive []Variant
+	Volitional       []Variant
+	Imperative       []Variant
+	Conditional      []Variant
+	Alternative      []Variant
+	Continuative     []Variant
 }
 
-type conjugator struct {
-	expectedEnd []string
-	conjugate   func([]rune) *Conjugations
+// Variant shows the variants for a conjugation.
+type Variant struct {
+	Plain, Formal, PlainNegative, FormalNegative string
 }
 
-var conjugators = map[string]conjugator{
-	"adj-i": conjugator{[]string{"い"}, iAdjConjugator},
-	"v1":    conjugator{[]string{"る"}, fillConjugator(v1Conjugator)},
+func loadCsv(reader io.Reader) [][]string {
+	r := csv.NewReader(reader)
+	r.Comma = '\t'
 
-	"v5b": conjugator{[]string{"ぶ"}, fillConjugator(v5Conjugator(v5bConjugator))},
-	"v5g": conjugator{[]string{"ぐ"}, fillConjugator(v5Conjugator(v5gConjugator))},
-	"v5k": conjugator{[]string{"く"}, fillConjugator(v5Conjugator(v5kConjugator))},
-	// TODO: v5k-s
-	"v5m": conjugator{[]string{"む"}, fillConjugator(v5Conjugator(v5mConjugator))},
-	"v5n": conjugator{[]string{"ぬ"}, fillConjugator(v5Conjugator(v5nConjugator))},
-	"v5r": conjugator{[]string{"る"}, fillConjugator(v5Conjugator(v5rConjugator))},
-	// TODO: v5r-i
-	"v5s": conjugator{[]string{"す"}, fillConjugator(v5Conjugator(v5sConjugator))},
-	"v5t": conjugator{[]string{"つ"}, fillConjugator(v5Conjugator(v5tConjugator))},
-	"v5u": conjugator{[]string{"う"}, fillConjugator(v5Conjugator(v5uConjugator))},
-	// TODO: v5u-s
-	// TODO: v5z
-	"vk":   conjugator{[]string{"くる", "来る", "來る"}, fillConjugator(vkConjugator)},
-	"vs-i": conjugator{[]string{"する", "為る", "す"}, fillConjugator(vsiConjugator)},
+	records, err := r.ReadAll()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return records
+}
+
+type posID int
+
+func loadPos() map[string]posID {
+	f, err := os.Open("../jconj/data/kwpos.csv")
+	if err != nil {
+		log.Fatal(err)
+	}
+	result := make(map[string]posID)
+	for _, record := range loadCsv(f) {
+		id, err := strconv.Atoi(record[0])
+		if err != nil {
+			log.Fatal(err)
+		}
+		result[record[1]] = posID(id)
+	}
+	delete(result, "n")
+	delete(result, "adj-na")
+	delete(result, "vs")
+	return result
+}
+
+type conjoData struct {
+	stem                int
+	okuri, euphr, euphk string
+	pos2                int
+}
+type conjoKey struct {
+	pos      posID
+	conj     conjID
+	neg, fml bool
+	onum     int
+}
+
+func loadConjo() map[conjoKey]conjoData {
+	f, err := os.Open("../jconj/data/conjo.csv")
+	if err != nil {
+		log.Fatal(err)
+	}
+	result := make(map[conjoKey]conjoData)
+	checkAtoi := func(a string) int {
+		i, err := strconv.Atoi(a)
+		if err != nil {
+			return 0
+		}
+		return i
+	}
+	checkParseBool := func(a string) bool {
+		b, err := strconv.ParseBool(a)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return b
+	}
+	for i, record := range loadCsv(f) {
+		if i == 0 {
+			continue
+		}
+		result[conjoKey{
+			posID(checkAtoi(record[0])),
+			conjID(checkAtoi(record[1])),
+			checkParseBool(record[2]),
+			checkParseBool(record[3]),
+			checkAtoi(record[4]),
+		}] = conjoData{
+			checkAtoi(record[5]),
+			record[6], record[7], record[8],
+			checkAtoi(record[9]),
+		}
+	}
+	return result
+}
+
+var (
+	conjos = loadConjo()
+	posIDs = loadPos()
+)
+
+type conjID int
+
+const (
+	nonPast conjID = 1 + iota
+	past
+	conjunctive
+	provisional
+	potential
+	passive
+	causative
+	causativePassive
+	volitional
+	imperative
+	conditional
+	alternative
+	continuative
+)
+
+var conjs = []conjID{
+	nonPast,
+	past,
+	conjunctive,
+	provisional,
+	potential,
+	passive,
+	causative,
+	causativePassive,
+	volitional,
+	imperative,
+	conditional,
+	alternative,
+	continuative,
 }
 
 // Conjugate a word given its part-of-speech.
 func Conjugate(word string, pos string) *Conjugations {
 	runeWord := []rune(word)
-	c, ok := conjugators[pos]
-	if !ok {
+	if len(runeWord) < 2 {
 		return nil
 	}
-	if !unicode.In(runeWord[len(runeWord)-1], unicode.Hiragana) {
-		return nil
+	posID := posIDs[pos]
+	return &Conjugations{
+		NonPast:          conjugate(nonPast, runeWord, posID),
+		Past:             conjugate(past, runeWord, posID),
+		Conjunctive:      conjugate(conjunctive, runeWord, posID),
+		Provisional:      conjugate(provisional, runeWord, posID),
+		Potential:        conjugate(potential, runeWord, posID),
+		Passive:          conjugate(passive, runeWord, posID),
+		Causative:        conjugate(causative, runeWord, posID),
+		CausativePassive: conjugate(causativePassive, runeWord, posID),
+		Volitional:       conjugate(volitional, runeWord, posID),
+		Imperative:       conjugate(imperative, runeWord, posID),
+		Conditional:      conjugate(conditional, runeWord, posID),
+		Alternative:      conjugate(alternative, runeWord, posID),
+		Continuative:     conjugate(continuative, runeWord, posID),
 	}
-	defer func() {
-		if r := recover(); r != nil {
-			if r == "checkSuffix" {
-				log.Printf("Expected %s %s to end with %s", pos, string(word), c.expectedEnd)
-			} else {
-				log.Fatal(r)
+}
+
+func conjugate(conj conjID, runeWord []rune, pos posID) []Variant {
+	var variants []Variant
+	for onum := 1; onum < 10; onum++ {
+		variant := Variant{}
+		set := false
+		for neg := 0; neg <= 1; neg++ {
+			for fml := 0; fml <= 1; fml++ {
+				key := conjoKey{pos, conj, neg == 1, fml == 1, onum}
+				c, ok := conjos[key]
+				if !ok {
+					break
+				}
+				set = true
+				result := construct(runeWord, c)
+				if neg == 1 {
+					if fml == 1 {
+						variant.FormalNegative = result
+					} else {
+						variant.PlainNegative = result
+					}
+				} else {
+					if fml == 1 {
+						variant.Formal = result
+					} else {
+						variant.Plain = result
+					}
+				}
 			}
 		}
-	}()
-	checkSuffix(runeWord, c.expectedEnd)
-	return c.conjugate(runeWord)
-}
-
-func checkSuffix(word []rune, expected []string) {
-	for _, e := range expected {
-		suffix := string(word[len(word)-len([]rune(e)):])
-		if suffix == e {
-			return
+		if set {
+			variants = append(variants, variant)
 		}
 	}
-	panic("checkSuffix")
+	return variants
 }
 
-func cutOff(word []rune, n int) string {
-	return string(word[:len(word)-n])
-}
-
-func cutOffOne(word []rune) string {
-	return cutOff(word, 1)
-}
-
-func fillConjugator(inner func([]rune) *Conjugations) func([]rune) *Conjugations {
-	return func(word []rune) *Conjugations {
-		c := inner(word)
-		naiForm := []rune(c.Negative)
-		checkSuffix(naiForm, []string{"ない"})
-		c.Conditional = c.Past + "ら"
-		c.NegativeNominal = cutOff(naiForm, 2) + "なく"
-		c.NegativeParticiple = cutOff(naiForm, 2) + "ないで"
-		c.NegativePast = cutOff(naiForm, 2) + "なかった"
-		c.NegativePolite = c.Nominal + "ません"
-		c.NegativeProvisionalConditional = cutOff(naiForm, 2) + "なければ"
-		c.NegativeProvisionalConditionalColloquial = cutOff(naiForm, 2) + "なきゃ"
-		c.PastPolite = c.Nominal + "ました"
-		c.Polite = c.Nominal + "ます"
-		c.Wish = c.Nominal + "たい"
-		c.WishNominal = c.Nominal + "たく"
-		c.WishPast = c.Nominal + "たかった"
-		c.VolitionalPolite = c.Nominal + "ましょう"
-		return c
+func construct(runeWord []rune, c conjoData) string {
+	iskana := runeWord[len(runeWord)-2] > 'あ' && runeWord[len(runeWord)-2] <= 'ん'
+	if iskana && c.euphr != "" || !iskana && c.euphk != "" {
+		c.stem++
 	}
-}
-
-func iAdjConjugator(word []rune) *Conjugations {
-	radical := cutOffOne(word)
-	Nominal := radical + "く"
-	return &Conjugations{
-		Negative:       Nominal + "ない",
-		NegativePolite: Nominal + "ありません",
-		Nominal:        Nominal,
-		Participle:     Nominal + "て",
-		Past:           radical + "かった",
-		ProvisionalConditional: radical + "ければ",
-		Volitional:             radical + "かろう",
-	}
-}
-
-func v1Conjugator(word []rune) *Conjugations {
-	Nominal := cutOffOne(word)
-	return &Conjugations{
-		Causative:              Nominal + "させる",
-		Imperative:             Nominal + "ろ",
-		Negative:               Nominal + "ない",
-		Nominal:                Nominal,
-		Participle:             Nominal + "て",
-		Passive:                Nominal + "られる",
-		Past:                   Nominal + "た",
-		Potential:              Nominal + "れる",
-		ProvisionalConditional: Nominal + "れば",
-		Volitional:             Nominal + "よう",
-	}
-}
-
-func v5Conjugator(inner func([]rune) Conjugations) func([]rune) *Conjugations {
-	return func(word []rune) *Conjugations {
-		c := inner(word)
-
-		Negative := []rune(c.Negative)
-		checkSuffix(Negative, []string{"ない"})
-		c.Causative = cutOff(Negative, 2) + "せる"
-		c.Passive = cutOff(Negative, 2) + "れる"
-
-		Potential := []rune(c.Potential)
-		checkSuffix(Potential, []string{"る"})
-		c.Imperative = cutOffOne(Potential)
-		c.ProvisionalConditional = cutOffOne(Potential) + "ば"
-		return &c
-	}
-}
-
-func v5bConjugator(word []rune) Conjugations {
-	root := cutOffOne(word)
-	return Conjugations{
-		Negative:   root + "ばない",
-		Nominal:    root + "び",
-		Participle: root + "んで",
-		Past:       root + "んだ",
-		Potential:  root + "べる",
-		Volitional: root + "ぼう",
-	}
-}
-
-func v5gConjugator(word []rune) Conjugations {
-	root := cutOffOne(word)
-	return Conjugations{
-		Negative:   root + "がない",
-		Nominal:    root + "ぎ",
-		Participle: root + "いで",
-		Past:       root + "いた",
-		Potential:  root + "げる",
-		Volitional: root + "ごう",
-	}
-}
-
-func v5kConjugator(word []rune) Conjugations {
-	root := cutOffOne(word)
-	return Conjugations{
-		Negative:   root + "かない",
-		Nominal:    root + "き",
-		Participle: root + "いて",
-		Past:       root + "いた",
-		Potential:  root + "ける",
-		Volitional: root + "こう",
-	}
-}
-
-func v5mConjugator(word []rune) Conjugations {
-	root := cutOffOne(word)
-	return Conjugations{
-		Negative:   root + "まない",
-		Nominal:    root + "み",
-		Participle: root + "んで",
-		Past:       root + "んだ",
-		Potential:  root + "める",
-		Volitional: root + "もう",
-	}
-}
-
-func v5nConjugator(word []rune) Conjugations {
-	root := cutOffOne(word)
-	return Conjugations{
-		Negative:   root + "なない",
-		Nominal:    root + "に",
-		Participle: root + "んで",
-		Past:       root + "んだ",
-		Potential:  root + "ねる",
-		Volitional: root + "のう",
-	}
-}
-
-func v5rConjugator(word []rune) Conjugations {
-	root := cutOffOne(word)
-	return Conjugations{
-		Negative:   root + "らない",
-		Nominal:    root + "り",
-		Participle: root + "って",
-		Past:       root + "った",
-		Potential:  root + "れる",
-		Volitional: root + "ろう",
-	}
-}
-
-func v5sConjugator(word []rune) Conjugations {
-	root := cutOffOne(word)
-	Nominal := root + "し"
-	return Conjugations{
-		Negative:   root + "さない",
-		Nominal:    Nominal,
-		Participle: Nominal + "て",
-		Past:       Nominal + "た",
-		Potential:  root + "せる",
-		Volitional: root + "ぞう",
-	}
-}
-
-func v5tConjugator(word []rune) Conjugations {
-	root := cutOffOne(word)
-	return Conjugations{
-		Negative:   root + "たない",
-		Nominal:    root + "ち",
-		Participle: root + "って",
-		Past:       root + "った",
-		Potential:  root + "てる",
-		Volitional: root + "とう",
-	}
-}
-
-func v5uConjugator(word []rune) Conjugations {
-	root := cutOffOne(word)
-	return Conjugations{
-		Negative:   root + "わない",
-		Nominal:    root + "い",
-		Participle: root + "って",
-		Past:       root + "った",
-		Potential:  root + "える",
-		Volitional: root + "おう",
-	}
-}
-
-func vkConjugator(word []rune) *Conjugations {
-	uForm := cutOffOne(word)
-	var iForm, oForm string
-	if word[len(word)-2] == 'く' {
-		iForm = cutOff(word, 2) + "き"
-		oForm = cutOff(word, 2) + "こ"
+	var result string
+	if iskana {
+		result = string(runeWord[:len(runeWord)-c.stem]) + c.euphr + c.okuri
 	} else {
-		iForm = cutOffOne(word)
-		oForm = cutOffOne(word)
+		result = string(runeWord[:len(runeWord)-c.stem]) + c.euphk + c.okuri
 	}
-	return &Conjugations{
-		Causative:              oForm + "させる",
-		Imperative:             oForm + "い",
-		Negative:               oForm + "ない",
-		Nominal:                iForm,
-		Participle:             iForm + "て",
-		Passive:                oForm + "られる",
-		Past:                   iForm + "た",
-		Potential:              oForm + "れる",
-		ProvisionalConditional: uForm + "れば",
-		Volitional:             oForm + "よう",
-	}
-}
-
-func vsiConjugator(word []rune) *Conjugations {
-	var c *Conjugations
-	suConj := func(root string) *Conjugations {
-		return &Conjugations{
-			Causative:              root + "させる",
-			Imperative:             root + "しろ",
-			Nominal:                root + "し",
-			Passive:                root + "される",
-			Potential:              root + "できる",
-			ProvisionalConditional: root + "すれば",
-			Volitional:             root + "しよう",
-		}
-	}
-	if word[len(word)-2] == 'す' {
-		c = suConj(cutOff(word, 2))
-	} else if word[len(word)-1] == 'す' {
-		c = suConj(cutOffOne(word))
-	} else {
-		c = &Conjugations{Nominal: cutOffOne(word)}
-	}
-	c.Negative = c.Nominal + "ない"
-	c.Participle = c.Nominal + "て"
-	c.Past = c.Nominal + "た"
-	return c
+	return result
 }
